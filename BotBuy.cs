@@ -325,6 +325,60 @@ public sealed class BotBuyPatch : BasePlugin
                 }
             }
         });
+        // Armor-First & Helmet Patch
+        AddTimer(1.5f, () =>
+        {
+            if (IsFirstRoundOfHalf()) return;
+
+            foreach (var p in allPlayers)
+            {
+                if (!p.IsValid || !p.IsBot) continue;
+                if (p.InGameMoneyServices == null) continue;
+
+                var pawn = p.PlayerPawn.Value;
+                if (pawn == null || !pawn.IsValid) continue;
+                if (pawn.WeaponServices == null) continue;
+                if (pawn.ItemServices == null || pawn.ItemServices.Handle == nint.Zero) continue;
+
+                int armor = pawn.ArmorValue;
+                string? targetGun = TryGetTargetGun(pawn);
+
+                // No armor + target gun: refund, kevlar, rebuy by budget (AWP: 50% skip to allow no-armor AWP)
+                if (armor <= 0 && targetGun != null)
+                {
+                    if (targetGun == "weapon_awp" && Random.Shared.NextSingle() < 0.5f)
+                    {
+                        // keep no-armor AWP
+                    }
+                    else if (Refund(p, targetGun))
+                    {
+                        if (!Buy(p, "item_kevlar"))
+                        {
+                            Buy(p, targetGun);
+                            continue;
+                        }
+                        string preferred = targetGun == "weapon_awp"
+                            ? (p.Team == CsTeam.Terrorist ? "weapon_ak47" : "weapon_m4a1_silencer")
+                            : targetGun;
+                        BuyRifleByBudget(p, preferred);
+                    }
+                    else
+                    {
+                        // Refund blocked (anti-grind): at least patch kevlar
+                        Buy(p, "item_kevlar");
+                    }
+                }
+
+                // Patch helmet
+                var itemServices = new CCSPlayer_ItemServices(pawn.ItemServices.Handle);
+                if (pawn.ArmorValue > 99
+                    && !itemServices.HasHelmet
+                    && p.InGameMoneyServices.Account > 350)
+                {
+                    Buy(p, "item_assaultsuit");
+                }
+            }
+        });
         // Buy Defuser
         AddTimer(2.0f, () =>
         {
@@ -589,6 +643,41 @@ public sealed class BotBuyPatch : BasePlugin
             weaponName.StartsWith("weapon_xm1014") ||
             weaponName.StartsWith("weapon_negev") ||
             weaponName.StartsWith("weapon_m249");
+    }
+
+    // Find target gun (AK/M4/P90/AWP) in bot inventory
+    private string? TryGetTargetGun(CCSPlayerPawn pawn)
+    {
+        if (pawn == null || !pawn.IsValid || pawn.WeaponServices == null) return null;
+        foreach (var wHandle in pawn.WeaponServices.MyWeapons)
+        {
+            var w = wHandle.Value;
+            if (w == null) continue;
+            string name = w.DesignerName;
+            if (name == "weapon_ak47" || name == "weapon_m4a1" || name == "weapon_m4a1_silencer"
+                || name == "weapon_p90" || name == "weapon_awp")
+                return name;
+        }
+        return null;
+    }
+
+    // Buy rifle by budget ladder
+    private void BuyRifleByBudget(CCSPlayerController player, string preferred)
+    {
+        if (!player.IsValid || !player.IsBot) return;
+
+        string[] ladder;
+        if (player.Team == CsTeam.Terrorist)
+            ladder = new[] { preferred, "weapon_galilar", "weapon_mac10" };
+        else if (player.Team == CsTeam.CounterTerrorist)
+            ladder = new[] { preferred, "weapon_famas", "weapon_mp9" };
+        else
+            return;
+
+        foreach (var gun in ladder)
+        {
+            if (Buy(player, gun)) return;
+        }
     }
 
 //----------------------------------------------------------------------------------------------

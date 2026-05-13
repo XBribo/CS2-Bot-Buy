@@ -343,10 +343,11 @@ public sealed class BotBuyPatch : BasePlugin
                 int armor = pawn.ArmorValue;
                 string? targetGun = TryGetTargetGun(pawn);
 
-                // No armor + target gun: refund, kevlar, rebuy by budget (AWP: 50% skip to allow no-armor AWP)
+                // Detect no armor + target gun: refund, kevlar, rebuy by budget
                 if (armor <= 0 && targetGun != null)
                 {
-                    if (targetGun == "weapon_awp" && Random.Shared.NextSingle() < 0.5f)
+                    //AWP: 20% allow no-armor AWP
+                    if (targetGun == "weapon_awp" && Random.Shared.NextSingle() < 0.2f)
                     {
                         // keep no-armor AWP
                     }
@@ -364,7 +365,7 @@ public sealed class BotBuyPatch : BasePlugin
                     }
                     else
                     {
-                        // Refund blocked (anti-grind): at least patch kevlar
+                        // Refund blocked wtf? try to buy kevlar
                         Buy(p, "item_kevlar");
                     }
                 }

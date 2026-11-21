@@ -61,16 +61,19 @@ public sealed partial class BotBuyPatch
             ("bot_allow_pistols", GunClass.Pistol), ("bot_allow_sub_machine_guns", GunClass.Smg),
             ("bot_allow_rifles", GunClass.Rifle), ("bot_allow_shotguns", GunClass.Shotgun),
             ("bot_allow_snipers", GunClass.Sniper), ("bot_allow_machine_guns", GunClass.MachineGun) })
-            if (BoolCvar(name, true)) allowed |= group;
+            if (ConVar<bool>.Find(name)?.Value ?? true) allowed |= group;
 
-        bool hard = ConVar.Find("sv_mmqueue_reservation")?.StringValue.StartsWith('Q') != true
-            && (BoolCvar("game_online", true) ? IntCvar("bot_difficulty", 1) >= 2
-                : IntCvar("custom_bot_difficulty", 0) is 4 or 5);
-        var options = new RoundOptions(opening, hard, BoolCvar("bot_randombuy", false),
-            last ? 0 : (int)FloatCvar("bot_eco_limit", 2000), FloatCvar("sv_gravity", 800) == 230f,
-            rules.MapHasBombTarget, allowed, BoolCvar("bot_allow_grenades", true) ? FloatCvar("sv_bot_buy_grenade_chance", 33) : 0,
+        bool online = ConVar<bool>.Find("game_online")?.Value ?? true;
+        bool hard = ConVar<string>.Find("sv_mmqueue_reservation")?.Value.StartsWith('Q') != true
+            && (online ? ConVar<int>.Find("bot_difficulty")?.Value >= 2
+                : ConVar<int>.Find("custom_bot_difficulty")?.Value is 4 or 5);
+        float grenadeChance = ConVar<bool>.Find("bot_allow_grenades")?.Value == false
+            ? 0 : ConVar<float>.Find("sv_bot_buy_grenade_chance")?.Value ?? 33;
+        var options = new RoundOptions(opening, hard, ConVar<bool>.Find("bot_randombuy")?.Value ?? false,
+            last ? 0 : (int)(ConVar<float>.Find("bot_eco_limit")?.Value ?? 2000), ConVar<float>.Find("sv_gravity")?.Value == 230f,
+            rules.MapHasBombTarget, allowed, grenadeChance,
             new[] { "smoke", "flash", "decoy", "molotov", "hegrenade" }
-                .Select(n => Math.Max(0, FloatCvar($"sv_bot_buy_{n}_weight", n == "hegrenade" ? 6 : 1))).ToArray());
+                .Select(n => Math.Max(0, ConVar<float>.Find($"sv_bot_buy_{n}_weight")?.Value ?? (n == "hegrenade" ? 6 : 1))).ToArray());
 
         List<(int Slot, ControllerPlan Plan)> orders = [];
         foreach (var team in bots.GroupBy(p => p.Team))

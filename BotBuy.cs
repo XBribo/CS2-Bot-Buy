@@ -18,13 +18,13 @@ public sealed partial class BotBuyPatch : BasePlugin
     public HookResult OnRoundPrestart(EventRoundPrestart @event, GameEventInfo info)
     {
         _loadout?.ResetStartingPistols();
-        if (BuysEnabled() && ConVar.Find("mp_ct_default_secondary")?.StringValue == "weapon_hkp2000")
+        if (BuysEnabled() && ConVar<string>.Find("mp_ct_default_secondary")?.Value == "weapon_hkp2000")
             _loadout?.RollStartingPistols();
         return HookResult.Continue;
     }
 
     private bool BuysEnabled() => _controllerEnabled && Server.MapName is not ("aim_rush" or "rush_001")
-        && string.IsNullOrEmpty(ConVar.Find("bot_loadout")?.StringValue);
+        && string.IsNullOrEmpty(ConVar<string>.Find("bot_loadout")?.Value);
 
     [GameEventHandler]
     public HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
@@ -38,9 +38,9 @@ public sealed partial class BotBuyPatch : BasePlugin
         var players = Utilities.GetPlayers().Where(CanShop).ToList();
 
         int played = rules.TotalRoundsPlayed;
-        int max = IntCvar("mp_maxrounds", 24);
+        int max = ConVar<int>.Find("mp_maxrounds")?.Value ?? 24;
         if (max < 2) max = 24;
-        int otRounds = IntCvar("mp_overtime_maxrounds", 6);
+        int otRounds = ConVar<int>.Find("mp_overtime_maxrounds")?.Value ?? 6;
         int otHalf = otRounds >= 2 ? otRounds / 2 : 3;
         bool opening = played == 0 || played == max / 2 || (played >= max && (played - max) % otHalf == 0);
         bool last = played + 1 == max / 2 || played + 1 == max || (played >= max && (played + 1 - max) % otHalf == 0);
@@ -74,18 +74,4 @@ public sealed partial class BotBuyPatch : BasePlugin
         && !p.ControllingBot && !p.HasBeenControlledByPlayerThisRound
         && p.Team is CsTeam.CounterTerrorist or CsTeam.Terrorist && p.InGameMoneyServices != null
         && p.PlayerPawn.Value is { IsValid: true, WeaponServices: not null };
-
-    private static int IntCvar(string name, int fallback) => (int)FloatCvar(name, fallback);
-    private static bool BoolCvar(string name, bool fallback) => FloatCvar(name, fallback ? 1 : 0) != 0;
-    private static float FloatCvar(string name, float fallback)
-    {
-        var cvar = ConVar.Find(name);
-        return cvar?.Type switch
-        {
-            ConVarType.Float32 => cvar.GetPrimitiveValue<float>(),
-            ConVarType.Int32 => cvar.GetPrimitiveValue<int>(),
-            ConVarType.Bool => cvar.GetPrimitiveValue<bool>() ? 1 : 0,
-            _ => fallback
-        };
-    }
 }
